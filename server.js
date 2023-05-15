@@ -10,11 +10,13 @@ const mongoose = require("mongoose");
 mongoose.Promise = require("bluebird");
 const compression = require("compression");
 const http = require("http").Server(app);
+const io = require("socket.io");
+const sharedSession = require("express-socket.io-session");
 
 //bodyparser middleware
 app.use(express.json());
 
-const port = 1337;
+const port = process.env.PORT || 3000;
 const methodOverride = require("method-override");
 const multer = require("multer");
 const upload = multer({
@@ -45,6 +47,9 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+
+const databaseUsers = client.db("studsdb");
+const collectionUsers = databaseUsers.collection("col_users");
 
 
 //session store
@@ -112,7 +117,64 @@ app.use("/theme", require("./routes/aliTheme"));
 app.use("/chats", require("./routes/chatroute"));
 
 
+//integrating socketio
+socket = io(http);
+//session
+socket.use(sharedSession(session1, {
+  autoSave: true
+}));
 
-http.listen(port, () => {
-  console.log("Running on Port: " + port);
+
+//database connection
+const Chat = require("./models/chatSchema");
+
+//setup event listener
+socket.on("connection", async (socket) => {
+  console.log("user connected");
+  console.log(socket.handshake.session.user.name);
+
+  socket.on("disconnect", function () {
+    console.log("user disconnected");
+  });
+
+  //Somebody is typing
+  socket.on("typing", data => {
+    socket.broadcast.emit("notifyTyping", {
+      user: data.user,
+      message: data.message
+    });
+  });
+
+  //when somebody stops typing
+  socket.on("stopTyping", () => {
+    socket.broadcast.emit("notifyStopTyping");
+  });
+
+  socket.on("chat message", async function (msg) {
+    console.log("message: " + msg);
+
+    //broadcast message to everyone in port except yourself.
+    socket.broadcast.emit("received", { message: msg });
+
+    //saves chat to the database
+    connect.then(async (db) => {
+      const user1 = socket.handshake.session.user.name
+      const user = await collectionUsers.findOne({
+        name: user1
+      });
+      let chatMessage = new Chat({
+        message: msg,
+        sender: user.name,
+      });
+
+      chatMessage.chatID = user.chats;
+      await chatMessage.save();
+    });
+  });
+
+
 });
+
+http.listen(port, '0.0.0.0', () => {
+  console.log(`Server is up on port ${port}!`)
+})

@@ -1,12 +1,15 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
+const mongoose = require("mongoose");
+mongoose.Promise = require("bluebird");
 const session = require("express-session");
 const MongoDBSession = require("express-mongodb-session")(session);
-const Chats = require("../models/chatSchema");
 const router = express.Router();
 const http = require("http").Server(app);
 const io = require("socket.io");
 const sharedSession = require("express-socket.io-session");
+
 
 //database verbinden
 const { MongoClient, ServerApiVersion } = require("mongodb");
@@ -39,6 +42,9 @@ const session1 = session({
   store: store,
 });
 
+
+const Chats = require("../models/chatSchema");
+
 //integrating socketio
 socket = io(http);
 //session
@@ -70,7 +76,7 @@ router.route("/:chats").get( checkChat, async (req, res) => {
   console.log(chat1id);
   if (chat1id) {
     Chats.find({
-      chatID: chat1id
+      chatID: "1"
     }).then((results) => {
       console.log(results)
       res.render("chat", {
@@ -80,54 +86,6 @@ router.route("/:chats").get( checkChat, async (req, res) => {
   } else {
     res.status(404).send("Chat not found");
   }
-});
-
-
-//setup event listener
-socket.on("connection", async (socket) => {
-  console.log("user connected");
-  console.log(socket.handshake.session.user.name);
-
-  socket.on("disconnect", function () {
-    console.log("user disconnected");
-  });
-
-  //Somebody is typing
-  socket.on("typing", (data) => {
-    socket.broadcast.emit("notifyTyping", {
-      user: data.user,
-      message: data.message,
-    });
-  });
-
-  //when somebody stops typing
-  socket.on("stopTyping", () => {
-    socket.broadcast.emit("notifyStopTyping");
-  });
-
-  socket.on("chat message", async function (msg) {
-    console.log("message: " + msg);
-
-    //broadcast message to everyone in port except yourself.
-    socket.broadcast.emit("received", {
-      message: msg,
-    });
-
-    //saves chat to the database
-    connect.then(async (db) => {
-      const user1 = socket.handshake.session.user.name;
-      const user = await collectionUsers.findOne({
-        name: user1,
-      });
-      let chatMessage = new Chat({
-        message: msg,
-        sender: user.name,
-      });
-
-      chatMessage.chatID = user.chats;
-      await chatMessage.save();
-    });
-  });
 });
 
 module.exports = router;

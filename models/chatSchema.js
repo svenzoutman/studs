@@ -9,7 +9,7 @@ const chatSchema = new Schema({
     type: String
   },
   chatID: {
-    type: String
+    type: Array
   }
 }, {
   timestamps: true
