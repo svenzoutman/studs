@@ -20,7 +20,7 @@ var messages = document.getElementById("messages");
     let span = document.createElement("span");
     var messages = document.getElementById("messages");
     messages.appendChild(li).append(data.message);
-    messages.appendChild(span).append(`by Kaas: just now`);
+    messages.appendChild(span).append(`reveived: just now`);
 
     console.log("Bericht ontvangen");
   });
